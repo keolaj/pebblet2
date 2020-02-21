@@ -16,12 +16,31 @@ class SignUp extends React.Component {
 	}
 	handleSubmit = (event) => {
 		event.preventDefault();
-		console.log('sign up, username: ' + this.state.username)
+		console.log('sign up, username: ' + this.state.username);
+
+		axios.post('/user/', {
+			username: this.state.username,
+			password: this.state.password
+		})
+			.then((res, err) => {
+				console.log(res);
+				if (res.data.error) {
+					console.log('error: ' + res.data.error);
+					
+				} else {
+					console.log('successful sign up')
+					this.setState({
+						redirectTo: '/login'
+					})
+				}
+			})
+			.catch(err => console.log('sign up server error: ' + err));
 	}
 	render() {
 		return (
 			<div>
-				<input type='text' name='username' onChange={this.handleOnChange} />
+				<input type='text' name='username' onChange={this.handleOnChange} placeholder={'username'}/>
+				<input type='text' name='password' onChange={this.handleOnChange} placeholder={'password'}/>
 				<div style={{'width': 100, 'height': 100}} onClick={this.handleSubmit}>
 					submit
 				</div>
