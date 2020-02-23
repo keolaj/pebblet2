@@ -1,10 +1,15 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const fileUpload = require('express-fileupload');
 const user = require('./routes/user.routes');
 const session = require('express-session');
 const passport = require('passport');
-const cors = require('cors');
+const Grid = require('gridfs-stream');
+const multer = require('multer');
+const bodyParser = require('body-parser')
+const GridFsStorage = require('multer-gridfs-storage');
+const methodOverride = require('method-override');
+const crypto = require('crypto');
+const path = require('path')
 
 require('dotenv').config();
 
@@ -12,7 +17,6 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 app.use(express.json());
-app.use(fileUpload());
 app.use(session({
 	secret: "ajslkfdjlkent",
 	resave: false,
@@ -20,8 +24,10 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
-app.use(cors());
+app.use(bodyParser.json())
+app.use(methodOverride('_method'))
 
+let gfs;
 const uri = process.env.ATLAS_URI;
 mongoose.connect(uri, {
 		useNewUrlParser: true,
@@ -31,11 +37,14 @@ mongoose.connect(uri, {
 	.catch(err => console.log(err));
 const connection = mongoose.connection;
 connection.once('open', () => {
-	console.log("MongoDB database connection established successfully")
+	console.log("MongoDB database connection established successfully");
+	gfs = Grid(connection.db, mongoose.mongo);
+	gfs.collection('uploads');
+	module.exports = gfs
 });
 
 app.use('/user', user);
 
 app.listen(port, () => {
 	console.log('App listening on port: ' + port);
-})
+});

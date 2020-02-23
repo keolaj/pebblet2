@@ -6,7 +6,8 @@ class SignUp extends React.Component {
 		super(props);
 		this.state = {
 			username: '',
-			password: ''
+			password: '',
+			email: ''
 		}
 	}
 	handleOnChange = (event) => {
@@ -20,7 +21,8 @@ class SignUp extends React.Component {
 
 		axios.post('/user/', {
 			username: this.state.username,
-			password: this.state.password
+			password: this.state.password,
+			email: this.state.email
 		})
 			.then((res, err) => {
 				console.log(res);
@@ -41,6 +43,7 @@ class SignUp extends React.Component {
 			<div>
 				<input type='text' name='username' onChange={this.handleOnChange} placeholder={'username'}/>
 				<input type='text' name='password' onChange={this.handleOnChange} placeholder={'password'}/>
+				<input type='text' name='email' onChange={this.handleOnChange} placeholder={'email'} />
 				<div style={{'width': 100, 'height': 100}} onClick={this.handleSubmit}>
 					submit
 				</div>

@@ -1,13 +1,17 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 const bcrypt = require('bcryptjs');
+const postSchema = require('./post.model');
 
 const userSchema = new Schema({
-	uuid: { type: String, required: false},
 	username: { type: String, required: true },
 	password: { type: String, required: true },
-	email: { type: String, required: false },
-	date: { type: Date, required: false }
+	name: { type: String, required: false },
+	bio: { type: String, required: false },
+	email: { type: String, required: true },
+	posts: [ postSchema ],
+	follwers: { userid: { type: String, required: true } },
+	date: { type: Date, required: true }
 });
 
 userSchema.methods = {
@@ -27,6 +31,7 @@ userSchema.pre('save', function (next) {
 		console.log('user.model.js hashpassword in pre save');
 		
 		this.password = this.hashPassword(this.password);
+		console.log('user.model hash password done')
 
 		next();
 	}
