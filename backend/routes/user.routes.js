@@ -63,13 +63,13 @@ router.get('/', (req, res) => {
 	if (req.user && req.isAuthenticated()) {
 		res.json({ user: {
 			username: req.user.username,
-			posts: req.user.posts,
-			id: req.user._id
+			posts: req.user.posts
 		}});
 	} else {
 		res.json({ user: null });
 	}
 });
+
 router.post('/login', function(req, res, next) {
 		console.log('routes/user.routes.js, login, req.body: ' + JSON.stringify(req.body));
 		next();
@@ -94,7 +94,7 @@ router.post('/logout', (req, res) => {
     }
 });
 const storage = new GridFsStorage({
-	url: 'mongodb+srv://keola:Lokahi1011@cluster0-zqpvq.mongodb.net/test?retryWrites=true&w=majority',
+	url: 'mongodb+srv://keola:thisismypassword@cluster0-zqpvq.mongodb.net/test?retryWrites=true&w=majority',
 	file: (req, file) => {
 		return new Promise((resolve, reject) => {
 			crypto.randomBytes(16, (err, buf) => {
@@ -132,16 +132,21 @@ router.post('/upload', isUserAuthenticated, upload.single('file'), (req, res) =>
 router.get('/users/:username', isUserAuthenticated, (req, res) => {
 	
 	console.log("req params for get username: " +  req.params.username)
+	let userInfo = {}
 	User.findOne({username: req.params.username}, (err, obj) => {
-		console.log("obj console.log for get user: " + obj)
-		let userInfo = {
-			user: {
-				username: obj.username,
-				posts: obj.posts,
-				name: obj.name,
-				bio: obj.bio
-			}
-		};
+		if (err) {
+			console.log(err);
+		} else {
+			console.log("obj console.log for get user: " + obj)
+			userInfo = {
+				user: {
+					username: obj.username,
+					posts: obj.posts,
+					name: obj.name,
+					bio: obj.bio
+				}
+			};
+		}
 		res.json(userInfo);
 	});
 })
@@ -153,7 +158,7 @@ router.post('/users/:username/:post/like', isUserAuthenticated, (req, res) => {
 		posts: {
 		_id: req.params.post,
 		likes: {$push: {
-			userid: req.user._id,
+			username: req.user.username,
 			date: date
 		}}
 	}}, () => {
@@ -168,7 +173,7 @@ router.post('/users/:username/:post/comment', isUserAuthenticated, (req, res) =>
 		posts: {
 			_id: req.params.post,
 			comments: {$push: {
-				userid: req.user._id,
+				username: req.user.username,
 				comment: req.body.comment,
 				date: date
 			}}
@@ -177,5 +182,28 @@ router.post('/users/:username/:post/comment', isUserAuthenticated, (req, res) =>
 		console.log('comment added')
 	})
 })
+
+router.post('/users/:username/follow', isUserAuthenticated, (req, res) => {
+	User.findOneAndUpdate(
+		{username: req.params.username},
+		{$push: {followers: {username: req.user.username}}},
+		{new: true}, (err, res) => {
+			if (err) {
+				console.log(err)
+			} else {
+				console.log('follower added')
+			}
+		})
+		User.findOneAndUpdate(
+			{username: req.user.username},
+			{$push: {following: {username: req.params.username}}},
+			{new: true}, (err, res) => {
+				if (err) {
+					console.log(err)
+				} else {
+					console.log('following added')
+				}
+			})
+});
 
 module.exports = router;

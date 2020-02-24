@@ -18,9 +18,18 @@ class User extends React.Component {
 				})
 			})
 	}
+	followUser = () => {
+		axios.post(`/user/users/${this.props.match.params.username}/follow`)
+			.then((res) => {
+				console.log(res)
+			})
+	}
 	render() {
 		return (
-		<h1>user: {this.state.user.username}</h1>
+			<div>
+				<h1>user: {this.state.user.username}</h1>
+				<h1 onClick={this.followUser}>follow</h1>
+			</div>
 		)
 	}
 }

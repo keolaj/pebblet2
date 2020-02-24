@@ -10,7 +10,8 @@ const userSchema = new Schema({
 	bio: { type: String, required: false },
 	email: { type: String, required: true },
 	posts: [ postSchema ],
-	follwers: { userid: { type: String, required: true } },
+	followers: [ { username: { type: String, required: false } } ],
+	following: [ { username: { type: String, required: false } } ],
 	date: { type: Date, required: true }
 });
 
