@@ -21,14 +21,16 @@ const isUserAuthenticated = (req, res, next) => {
 
 router.post('/', (req, res) => {
 	console.log('user sign up');
-	console.log('req body: '+ JSON.stringify(req.body));
+	console.log('req body: ' + JSON.stringify(req.body));
 
 	const username = req.body.username;
 	const password = req.body.password;
 	const email = req.body.email;
 	const date = new Date();
 
-	User.findOne({username: username}, (err, user) => {
+	User.findOne({
+		username: username
+	}, (err, user) => {
 		if (err) {
 			console.log('user.js error: ' + err);
 		} else if (user) {
@@ -45,53 +47,60 @@ router.post('/', (req, res) => {
 			newUser.save()
 				.then(() => {
 					res.json('user added')
-					console.log("user added: "+ res);
+					console.log("user added: " + res);
 				})
 				.catch((err) => {
 					res.status(400).json('error: ' + err);
 					console.log(err);
 				})
-				// .then(res => console.log('user saved successfully! : ' + res))
-				// .catch(err => console.log('error: ' + err));
+			// .then(res => console.log('user saved successfully! : ' + res))
+			// .catch(err => console.log('error: ' + err));
 		}
 	})
 });
 
 router.get('/', (req, res) => {
-    console.log('===== user!!======')
+	console.log('===== user!!======')
 	console.log(JSON.stringify(req.user))
 	if (req.user && req.isAuthenticated()) {
-		res.json({ user: {
-			username: req.user.username,
-			posts: req.user.posts
-		}});
-	} else {
-		res.json({ user: null });
-	}
-});
-
-router.post('/login', function(req, res, next) {
-		console.log('routes/user.routes.js, login, req.body: ' + JSON.stringify(req.body));
-		next();
-	}, passport.authenticate('local'), (req, res) => {
-		console.log('logged in', req.user);
-		let userInfo = {
+		res.json({
 			user: {
 				username: req.user.username,
 				posts: req.user.posts
 			}
-		}
-		res.send(userInfo);
+		});
+	} else {
+		res.json({
+			user: null
+		});
 	}
-);
+});
+
+router.post('/login', function (req, res, next) {
+	console.log('routes/user.routes.js, login, req.body: ' + JSON.stringify(req.body));
+	next();
+}, passport.authenticate('local'), (req, res) => {
+	console.log('logged in', req.user);
+	let userInfo = {
+		user: {
+			username: req.user.username,
+			posts: req.user.posts
+		}
+	}
+	res.send(userInfo);
+});
 
 router.post('/logout', (req, res) => {
-    if (req.user) {
-        req.logout()
-        res.send({ msg: 'logging out' })
-    } else {
-        res.send({ msg: 'no user to log out' })
-    }
+	if (req.user) {
+		req.logout()
+		res.send({
+			msg: 'logging out'
+		})
+	} else {
+		res.send({
+			msg: 'no user to log out'
+		})
+	}
 });
 const storage = new GridFsStorage({
 	url: 'mongodb+srv://keola:thisismypassword@cluster0-zqpvq.mongodb.net/test?retryWrites=true&w=majority',
@@ -100,18 +109,20 @@ const storage = new GridFsStorage({
 			crypto.randomBytes(16, (err, buf) => {
 				if (err) {
 					return reject(err)
-			  	}
-			  	const filename = buf.toString('hex') + path.extname(file.originalname);
-			 	const fileInfo = {
+				}
+				const filename = buf.toString('hex') + path.extname(file.originalname);
+				const fileInfo = {
 					filename: filename,
 					bucketName: 'uploads',
-			  	}
-			  	resolve(fileInfo)
+				}
+				resolve(fileInfo)
 			})
 		})
 	}
 });
-const upload = multer({ storage });
+const upload = multer({
+	storage
+});
 
 router.post('/upload', isUserAuthenticated, upload.single('file'), (req, res) => {
 	console.log(req.file);
@@ -121,8 +132,14 @@ router.post('/upload', isUserAuthenticated, upload.single('file'), (req, res) =>
 		caption: req.body.caption ? req.body.caption : null
 	}
 	console.log('user: ' + JSON.stringify(req.user._id));
-	
-	User.update({_id: req.user._id}, {$push: { 'posts': post}}, () => {
+
+	User.update({
+		_id: req.user._id
+	}, {
+		$push: {
+			'posts': post
+		}
+	}, () => {
 		console.log('done adding post');
 	})
 
@@ -130,10 +147,12 @@ router.post('/upload', isUserAuthenticated, upload.single('file'), (req, res) =>
 });
 
 router.get('/users/:username', isUserAuthenticated, (req, res) => {
-	
-	console.log("req params for get username: " +  req.params.username)
+
+	console.log("req params for get username: " + req.params.username)
 	let userInfo = {}
-	User.findOne({username: req.params.username}, (err, obj) => {
+	User.findOne({
+		username: req.params.username
+	}, (err, obj) => {
 		if (err) {
 			console.log(err);
 		} else {
@@ -156,12 +175,15 @@ router.post('/users/:username/:post/like', isUserAuthenticated, (req, res) => {
 	User.update({
 		username: req.params.username,
 		posts: {
-		_id: req.params.post,
-		likes: {$push: {
-			username: req.user.username,
-			date: date
-		}}
-	}}, () => {
+			_id: req.params.post,
+			likes: {
+				$push: {
+					username: req.user.username,
+					date: date
+				}
+			}
+		}
+	}, () => {
 		console.log('like added');
 	})
 })
@@ -172,11 +194,13 @@ router.post('/users/:username/:post/comment', isUserAuthenticated, (req, res) =>
 		username: req.params.username,
 		posts: {
 			_id: req.params.post,
-			comments: {$push: {
-				username: req.user.username,
-				comment: req.body.comment,
-				date: date
-			}}
+			comments: {
+				$push: {
+					username: req.user.username,
+					comment: req.body.comment,
+					date: date
+				}
+			}
 		}
 	}, () => {
 		console.log('comment added')
@@ -184,26 +208,63 @@ router.post('/users/:username/:post/comment', isUserAuthenticated, (req, res) =>
 })
 
 router.post('/users/:username/follow', isUserAuthenticated, (req, res) => {
-	User.findOneAndUpdate(
-		{username: req.params.username},
-		{$push: {followers: {username: req.user.username}}},
-		{new: true}, (err, res) => {
+	User.findOneAndUpdate({
+			username: req.params.username,
+			'followers.username': {
+				$ne: req.user.username
+			}
+		},
+		({
+			$addToSet: {
+				followers: {
+					username: req.user.username
+				}
+			}
+		}), (err, res) => {
 			if (err) {
 				console.log(err)
 			} else {
 				console.log('follower added')
 			}
 		})
-		User.findOneAndUpdate(
-			{username: req.user.username},
-			{$push: {following: {username: req.params.username}}},
-			{new: true}, (err, res) => {
-				if (err) {
-					console.log(err)
-				} else {
-					console.log('following added')
+	User.findOneAndUpdate({
+			username: req.user.username,
+			'following.username': {
+				$ne: req.params.username
+			}
+		},
+		({
+			$addToSet: {
+				following: {
+					username: req.params.username
 				}
-			})
+			}
+		}), (err, res) => {
+			if (err) {
+				console.log(err)
+			} else {
+				console.log('following added')
+			}
+		})
+	// let userToFollow = User.findOne({username: req.params.username})
+	// if (!userToFollow.followers.find({username: req.user.username})) {
+	// 	userToFollow.followers.push({uesrname: req.user.username});
+	// 	userToFollow.save(() => {
+	// 		console.log('follower added')
+	// 	})
+	// } else {
+	// 	console.log('user already is a follower')
+	// }
+
+	// let followingUser = User.findById(req.user._id);
+	// if (!followingUser.following.find({username: req.params.username})) {
+	// 	followingUser.following.push({username: req.params.username})
+	// 	followingUser.save(() => {
+	// 		console.log('following added')
+	// 	})
+	// } else {
+	// 	console.log('user is already following')
+	// }
 });
 
 module.exports = router;
