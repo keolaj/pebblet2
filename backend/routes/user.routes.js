@@ -133,34 +133,41 @@ const upload = multer({
 router.post('/upload', isUserAuthenticated, upload.single('file'), (req, res) => {
 	console.log(req.file);
 	console.log('upload file from: ' + JSON.stringify(req.user._id));
-	const vid = videoParser.parse(req.file.buffer)
-	console.log("resolution: " + vid.resolution())
-	crypto.randomBytes(16, (err, buf) => {
-		if (err) {
-			return reject(err)
-		}
-		const filename = buf.toString('hex') + path.extname(req.file.originalname);
-		const uploadStream = gfs.gfs.openUploadStream(filename)
-		uploadStream.write(req.file.buffer);
-		uploadStream.end();
-		let post = {
-			fileid: uploadStream.id,
-			date: req.file.uploadDate,
-			caption: req.body.caption ? req.body.caption : null
-		}
-		User.update({
-			_id: req.user._id
-		}, {
-			$push: {
-				'posts': post
+	console.log("original name extension: " + path.extname(req.file.originalname))
+	if (path.extname(req.file.originalname) != ".mp4" && path.extname(req.file.originalname) != ".jpeg") {
+		return res.status(404).send();
+	} else {
+		crypto.randomBytes(16, (err, buf) => {
+			if (err) {
+				return reject(err)
 			}
-		}, () => {
-			console.log('done adding post');
+			if (path.extname(req.file.originalname) === ".mp4") {
+				const vid = videoParser.parse(req.file.buffer)
+				console.log("resolution: " + vid.resolution())
+			}
+			const filename = buf.toString('hex') + path.extname(req.file.originalname);
+			const uploadStream = gfs.gfs.openUploadStream(filename)
+			uploadStream.write(req.file.buffer);
+			uploadStream.end();
+			let post = {
+				fileid: uploadStream.id,
+				date: req.file.uploadDate,
+				extension: path.extname(req.file.originalname), 
+				caption: req.body.caption ? req.body.caption : null
+			}
+			User.update({
+				_id: req.user._id
+			}, {
+				$push: {
+					'posts': post
+				}
+			}, () => {
+				console.log('done adding post');
+			})
+
+			res.status(200).send();
 		})
-
-		res.status(200).send();
-	})
-
+	}
 });
 
 router.get('/users/:username', isUserAuthenticated, (req, res) => {
@@ -206,16 +213,10 @@ router.get('/users/:username/:post', isUserAuthenticated, (req, res) => {
 	// 		return res.json(userInfo.user.posts);
 	// 	});
 	// })
-	gfs.gfs.findOneAndRead({
-		_id: req.params.id
-	}).then((filebuf) => {
-		const readableStream = new stream.Readable()
-		readable._read = () => {}
-		readable.push(filebuf);
-		readable.push(null);
-
-		readable.pipe(res)
-	})
+	console.log(req.params.post)
+	let readStream = gfs.gfs.openDownloadStream(mongoose.Types.ObjectId(req.params.post))
+	res.setHeader('content-type', 'video/mp4')
+	readStream.pipe(res)
 })
 
 router.post('/users/:username/:post/like', isUserAuthenticated, (req, res) => {

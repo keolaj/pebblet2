@@ -8,18 +8,20 @@ const bodyParser = require('body-parser')
 const methodOverride = require('method-override');
 const crypto = require('crypto');
 const path = require('path');
+const MongoStore = require('connect-mongo')(session)
 
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-app.use(express.json());
 app.use(session({
 	secret: "ajslkfdjlkent",
 	resave: false,
-	saveUnitialized: false
+	saveUninitialized: false,
+	store: new MongoStore({mongooseConnection: mongoose.connection, collection: 'session'})
 }));
+app.use(express.json());
 app.use(passport.initialize());
 app.use(passport.session());
 app.use(bodyParser.json())
@@ -36,7 +38,7 @@ mongoose.connect(uri, {
 const connection = mongoose.connection;
 connection.once('open', () => {
 	console.log("MongoDB database connection established successfully");
-	const gfs = new mongoose.mongo.GridFSBucket(mongoose.connection.db, 'uploads')
+	const gfs = new mongoose.mongo.GridFSBucket(mongoose.connection.db, 'uploads');
 	module.exports.gfs = gfs
 });
 

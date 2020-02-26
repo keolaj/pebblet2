@@ -15,6 +15,7 @@ const likeSchema = new Schema({
 
 const postSchema = new Schema({
 	fileid: { type: String, required: true },
+	extension : { type: String, required: true },
 	caption: { type: String, required: false },
 	comments: { type: [commentSchema] },
 	likes: { type: [likeSchema] },

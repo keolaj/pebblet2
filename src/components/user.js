@@ -35,11 +35,18 @@ class User extends React.Component {
 			})
 	}
 	render() {
+		const postArray = this.state.user.posts.map((post, index) => {
+			if (post.extension === '.mp4') {
+				return <video src={`/user/users/${this.props.match.params.username}/${this.state.user.posts[index].fileid}`} autoPlay loop key={post.fileid}/>
+			} else if (post.extension === '.jpeg') {
+				return <img src={`/user/users/${this.props.match.params.username}/${this.state.user.posts[index].fileid}`} key={post.fileid}/>
+			}
+		})
 		return (
 			<div>
 				<h1>user: {this.state.user.username}</h1>
 				<h1 onClick={this.followUser}>follow</h1>
-				{this.state.user.posts[0] ? <img src={`/user/users/${this.props.match.params.username}/${this.state.user.posts[0].fileid}`} /> : null}
+				{postArray}
 			</div>
 		)
 	}
