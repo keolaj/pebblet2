@@ -9,6 +9,8 @@ const GridFsStorage = require('multer-gridfs-storage');
 const path = require('path');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const videoParser = require('node-video-lib').MP4Parser;
+const stream = require('stream')
 
 const isUserAuthenticated = (req, res, next) => {
 	if (req.isAuthenticated()) {
@@ -102,48 +104,63 @@ router.post('/logout', (req, res) => {
 		})
 	}
 });
-const storage = new GridFsStorage({
-	url: 'mongodb+srv://keola:thisismypassword@cluster0-zqpvq.mongodb.net/test?retryWrites=true&w=majority',
-	file: (req, file) => {
-		return new Promise((resolve, reject) => {
-			crypto.randomBytes(16, (err, buf) => {
-				if (err) {
-					return reject(err)
-				}
-				const filename = buf.toString('hex') + path.extname(file.originalname);
-				const fileInfo = {
-					filename: filename,
-					bucketName: 'uploads',
-				}
-				resolve(fileInfo)
-			})
-		})
-	}
-});
+// const storage = new GridFsStorage({
+// 	url: 'mongodb+srv://keola:thisismypassword@cluster0-zqpvq.mongodb.net/test?retryWrites=true&w=majority',
+// 	file: (req, file) => {
+// 		return new Promise((resolve, reject) => {
+// 			crypto.randomBytes(16, (err, buf) => {
+// 				if (err) {
+// 					return reject(err)
+// 				}
+// 				const filename = buf.toString('hex') + path.extname(file.originalname);
+// 				const fileInfo = {
+// 					filename: filename,
+// 					bucketName: 'uploads',
+// 				}
+// 				resolve(fileInfo)
+// 			})
+// 		})
+// 	}
+// });
+const storage = multer.memoryStorage();
 const upload = multer({
-	storage
+	storage: storage,
+	fileFilter: (req, file, cb) => {
+		return cb(null, true)
+	}
 });
 
 router.post('/upload', isUserAuthenticated, upload.single('file'), (req, res) => {
 	console.log(req.file);
-	let post = {
-		fileid: req.file.id,
-		date: req.file.uploadDate,
-		caption: req.body.caption ? req.body.caption : null
-	}
-	console.log('user: ' + JSON.stringify(req.user._id));
-
-	User.update({
-		_id: req.user._id
-	}, {
-		$push: {
-			'posts': post
+	console.log('upload file from: ' + JSON.stringify(req.user._id));
+	const vid = videoParser.parse(req.file.buffer)
+	console.log("resolution: " + vid.resolution())
+	crypto.randomBytes(16, (err, buf) => {
+		if (err) {
+			return reject(err)
 		}
-	}, () => {
-		console.log('done adding post');
+		const filename = buf.toString('hex') + path.extname(req.file.originalname);
+		const uploadStream = gfs.gfs.openUploadStream(filename)
+		uploadStream.write(req.file.buffer);
+		uploadStream.end();
+		let post = {
+			fileid: uploadStream.id,
+			date: req.file.uploadDate,
+			caption: req.body.caption ? req.body.caption : null
+		}
+		User.update({
+			_id: req.user._id
+		}, {
+			$push: {
+				'posts': post
+			}
+		}, () => {
+			console.log('done adding post');
+		})
+
+		res.status(200).send();
 	})
 
-	res.status(200).send();
 });
 
 router.get('/users/:username', isUserAuthenticated, (req, res) => {
@@ -165,9 +182,40 @@ router.get('/users/:username', isUserAuthenticated, (req, res) => {
 					bio: obj.bio
 				}
 			};
+			return res.json(userInfo);
+			// userInfo.user.posts.forEach((val, index) => {
+			// 	gfs.gfs.findOne({_id: userInfo.user.posts[index].fileid}, (err, file) => {
+			// 		console.log('file id: ' + userInfo.user.posts[index].fileid)
+			// 		console.log('file test: ' + JSON.stringify(file));
+			// 		userInfo.user.posts[index].file = file;
+			// 		console.log("file test on user object: " + JSON.stringify(userInfo.user.posts[index].file))
+			// 		return res.json(userInfo.user.posts);
+			// 	});
+			// })
 		}
-		res.json(userInfo);
 	});
+})
+
+router.get('/users/:username/:post', isUserAuthenticated, (req, res) => {
+	// userInfo.user.posts.forEach((val, index) => {
+	// 	gfs.gfs.findOne({_id: userInfo.user.posts[index].fileid}, (err, file) => {
+	// 		console.log('file id: ' + userInfo.user.posts[index].fileid)
+	// 		console.log('file test: ' + JSON.stringify(file));
+	// 		userInfo.user.posts[index].file = file;
+	// 		console.log("file test on user object: " + JSON.stringify(userInfo.user.posts[index].file))
+	// 		return res.json(userInfo.user.posts);
+	// 	});
+	// })
+	gfs.gfs.findOneAndRead({
+		_id: req.params.id
+	}).then((filebuf) => {
+		const readableStream = new stream.Readable()
+		readable._read = () => {}
+		readable.push(filebuf);
+		readable.push(null);
+
+		readable.pipe(res)
+	})
 })
 
 router.post('/users/:username/:post/like', isUserAuthenticated, (req, res) => {
@@ -177,7 +225,7 @@ router.post('/users/:username/:post/like', isUserAuthenticated, (req, res) => {
 		posts: {
 			_id: req.params.post,
 			likes: {
-				$push: {
+				$addToSet: {
 					username: req.user.username,
 					date: date
 				}
@@ -208,6 +256,9 @@ router.post('/users/:username/:post/comment', isUserAuthenticated, (req, res) =>
 })
 
 router.post('/users/:username/follow', isUserAuthenticated, (req, res) => {
+	if (req.user.username === req.params.username) return res.status(404).json({
+		err: 'you are trying to follow yourself'
+	});
 	User.findOneAndUpdate({
 			username: req.params.username,
 			'followers.username': {

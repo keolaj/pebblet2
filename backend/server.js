@@ -3,13 +3,11 @@ const mongoose = require('mongoose');
 const user = require('./routes/user.routes');
 const session = require('express-session');
 const passport = require('passport');
-const Grid = require('gridfs-stream');
 const multer = require('multer');
 const bodyParser = require('body-parser')
-const GridFsStorage = require('multer-gridfs-storage');
 const methodOverride = require('method-override');
 const crypto = require('crypto');
-const path = require('path')
+const path = require('path');
 
 require('dotenv').config();
 
@@ -38,9 +36,8 @@ mongoose.connect(uri, {
 const connection = mongoose.connection;
 connection.once('open', () => {
 	console.log("MongoDB database connection established successfully");
-	gfs = Grid(connection.db, mongoose.mongo);
-	gfs.collection('uploads');
-	module.exports = gfs
+	const gfs = new mongoose.mongo.GridFSBucket(mongoose.connection.db, 'uploads')
+	module.exports.gfs = gfs
 });
 
 app.use('/user', user);
