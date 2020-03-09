@@ -3,12 +3,9 @@ const mongoose = require('mongoose');
 const user = require('./routes/user.routes');
 const session = require('express-session');
 const passport = require('passport');
-const multer = require('multer');
 const bodyParser = require('body-parser')
 const methodOverride = require('method-override');
-const crypto = require('crypto');
-const path = require('path');
-const MongoStore = require('connect-mongo')(session)
+const MongoStore = require('connect-mongo')(session);
 
 require('dotenv').config();
 

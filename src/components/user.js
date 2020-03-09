@@ -37,9 +37,23 @@ class User extends React.Component {
 	render() {
 		const postArray = this.state.user.posts.map((post, index) => {
 			if (post.extension === '.mp4') {
-				return <video src={`/user/users/${this.props.match.params.username}/${this.state.user.posts[index].fileid}`} autoPlay loop key={post.fileid}/>
+				return <video src={`/user/users/${this.props.match.params.username}/${this.state.user.posts[index].fileid}`} autoPlay loop key={post.fileid} onClick={() => {
+					this.setState(prevState => ({
+						user: {
+							...prevState.user,
+							posts: this.state.user.posts.filter(postFromArray => postFromArray !== post)
+						}
+					}))
+				}}/>
 			} else if (post.extension === '.jpeg') {
-				return <img src={`/user/users/${this.props.match.params.username}/${this.state.user.posts[index].fileid}`} key={post.fileid}/>
+				return <img src={`/user/users/${this.props.match.params.username}/${this.state.user.posts[index].fileid}`} key={post.fileid} onClick={() => {
+					this.setState(prevState => ({
+						user: {
+							...prevState.user,
+							posts: this.state.user.posts.filter(postFromArray => postFromArray !== post)
+						}
+					}))
+				}}/>
 			}
 		})
 		return (

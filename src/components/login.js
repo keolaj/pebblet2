@@ -1,5 +1,8 @@
 import React from 'react';
 import { Redirect } from 'react-router-dom';
+import { bindActionCreators } from 'redux';
+import { connect } from 'react-redux';
+import * as actionCreator from '../store/actions/actionCreator';
 const axios = require('axios');
 
 class Login extends React.Component {
@@ -11,6 +14,12 @@ class Login extends React.Component {
 			password: '',
 			redirectTo: ''
 		}
+		this.componentDidMount.bind(this)
+	}
+	componentDidMount() {
+		if (this.props.user) {
+			this.props.setRedirectTo('/');
+		}
 	}
 	onInputHandler = (event) => {
 		this.setState({
@@ -19,30 +28,12 @@ class Login extends React.Component {
 	}
 	onLoginHandler = (event) => {
 		event.preventDefault();
-		console.log('handlelogin')
-		axios.post('/user/login',  {
-			username: this.state.username,
-			password: this.state.password
-		})
-		.then(res => {
-			console.log('login res: ' + JSON.stringify(res));
-			if (res.status === 200) {
-				this.props.updateUser({
-					loggedIn: true,
-					user: res.data.user
-				})
-				this.setState({
-					redirectTo: '/'
-				})
-			}
-		})
-		.catch(err => {
-			console.log('login error: ' + err);
-		})
+		console.log('handlelogin');
+		this.props.loginUser(this.state.username, this.state.password)
 	}
 	render() {
-		if (this.state.redirectTo) {
-			return <Redirect to={this.state.redirectTo} />
+		if (this.props.redirectTo) {
+			return <Redirect to={this.props.redirectTo} />
 		} else {
 			return (
 				<div>
@@ -55,4 +46,17 @@ class Login extends React.Component {
 		}
 	}
 }
-export default Login;
+const mapStateToProps = state => {
+	return {
+		user: state.user,
+		redirectTo: state.redirectTo
+	}
+}
+function mapDispatchToProps(dispatch) {
+	return {
+		loginUser: (username, password) => dispatch(actionCreator.loginUser(username, password)),
+		setRedirectTo: (url) => dispatch(actionCreator.setRedirectTo(url))
+	}
+}
+
+export default connect(mapStateToProps, mapDispatchToProps)(Login);

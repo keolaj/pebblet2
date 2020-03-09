@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/user.model');
-const Post = require('../models/post.model')
+const postSchema = require('../models/post.model')
 const passport = require('../passport');
 const gfs = require('../server');
 const multer = require('multer');
@@ -10,7 +10,10 @@ const path = require('path');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const videoParser = require('node-video-lib').MP4Parser;
-const stream = require('stream')
+const stream = require('stream');
+const sendSeekable = require('send-seekable');
+
+router.use(sendSeekable);
 
 const isUserAuthenticated = (req, res, next) => {
 	if (req.isAuthenticated()) {
@@ -65,12 +68,26 @@ router.get('/', (req, res) => {
 	console.log('===== user!!======')
 	console.log(JSON.stringify(req.user))
 	if (req.user && req.isAuthenticated()) {
-		res.json({
-			user: {
-				username: req.user.username,
-				posts: req.user.posts
+		console.log('user is authenticated')
+		User.findOne({
+			_id: req.user._id
+		}, (err, obj) => {
+			let userInfo = {
+				username: obj.username,
+				date: obj.date,
+				email: obj.email,
+				following: obj.following,
+				followers: obj.followers,
+				posts: obj.posts
 			}
-		});
+			if (err) {
+				res.status(400).send();
+				return
+			}
+			res.json({
+				user: userInfo
+			})
+		})
 	} else {
 		res.json({
 			user: null
@@ -145,14 +162,14 @@ router.post('/upload', isUserAuthenticated, upload.single('file'), (req, res) =>
 				const vid = videoParser.parse(req.file.buffer)
 				console.log("resolution: " + vid.resolution())
 			}
-			const filename = buf.toString('hex') + path.extname(req.file.originalname);
+			const filename = buf.toString('hex') + path.extname(req.file.originalname).toUpperCase();
 			const uploadStream = gfs.gfs.openUploadStream(filename)
 			uploadStream.write(req.file.buffer);
 			uploadStream.end();
 			let post = {
 				fileid: uploadStream.id,
 				date: req.file.uploadDate,
-				extension: path.extname(req.file.originalname), 
+				extension: path.extname(req.file.originalname),
 				caption: req.body.caption ? req.body.caption : null
 			}
 			User.update({
@@ -203,20 +220,33 @@ router.get('/users/:username', isUserAuthenticated, (req, res) => {
 	});
 })
 
-router.get('/users/:username/:post', isUserAuthenticated, (req, res) => {
-	// userInfo.user.posts.forEach((val, index) => {
-	// 	gfs.gfs.findOne({_id: userInfo.user.posts[index].fileid}, (err, file) => {
-	// 		console.log('file id: ' + userInfo.user.posts[index].fileid)
-	// 		console.log('file test: ' + JSON.stringify(file));
-	// 		userInfo.user.posts[index].file = file;
-	// 		console.log("file test on user object: " + JSON.stringify(userInfo.user.posts[index].file))
-	// 		return res.json(userInfo.user.posts);
-	// 	});
-	// })
-	console.log(req.params.post)
-	let readStream = gfs.gfs.openDownloadStream(mongoose.Types.ObjectId(req.params.post))
-	res.setHeader('content-type', 'video/mp4')
-	readStream.pipe(res)
+const gridSchema = new mongoose.Schema({
+	length: {
+		type: Number
+	}
+}, {
+	strict: false
+});
+const Grid = mongoose.model('Grid', gridSchema, 'fs.files')
+
+router.get('/users/:username/:post', isUserAuthenticated, sendSeekable, (req, res) => {
+	Grid.findById(req.params.post, (err, obj) => {
+		if (obj) {
+			console.log("obj: " + obj.length);
+			let readStream = gfs.gfs.openDownloadStream(mongoose.Types.ObjectId(req.params.post))
+			res.sendSeekable(readStream, {
+				type: 'video/mp4',
+				length: obj.length
+			})
+			// readStream.on('data', (file) => {
+			// 	res.status(206);
+
+			// 	res.setHeader('Content-Length', obj.length.toString());
+			// 	res.send(file)
+			// })
+		}
+	})
+
 })
 
 router.post('/users/:username/:post/like', isUserAuthenticated, (req, res) => {
@@ -318,5 +348,33 @@ router.post('/users/:username/follow', isUserAuthenticated, (req, res) => {
 	// 	console.log('user is already following')
 	// }
 });
+
+router.get('/feed/:index', isUserAuthenticated, (req, res) => {
+	User.findOne({
+		_id: req.user._id
+	}, (err, reqUser) => {
+		if (err) {
+			console.log("feed error: " + err)
+			return;
+		} else if (reqUser) {
+			let feed = []
+			let promises = []
+			for (user of reqUser.following) {
+				const findPromise = User.findOne({username: user.username}).exec();
+				promises.push(findPromise);
+				findPromise.then(followingUser => {
+					if (followingUser) {
+						Array.prototype.push.apply(feed, followingUser.posts)
+					}
+				})
+			}
+			Promise.all(promises).then(() => {
+				res.json({
+					feed: feed
+				})
+			}).catch(err => console.log("promise err: " + err))
+		}
+	})
+})
 
 module.exports = router;
