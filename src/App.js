@@ -24,7 +24,7 @@ class App extends React.Component {
         this.componentDidMount.bind(this);
     }
     componentDidMount() {
-		console.log("component did mount state: " + JSON.stringify(this.state));
+		console.log("home component did mount state: " + JSON.stringify(this.state));
 		this.props.getUser();
     }
     logout = (event) => {

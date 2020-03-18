@@ -1,17 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/user.model');
-const postSchema = require('../models/post.model')
 const passport = require('../passport');
 const gfs = require('../server');
 const multer = require('multer');
-const GridFsStorage = require('multer-gridfs-storage');
 const path = require('path');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 const videoParser = require('node-video-lib').MP4Parser;
-const stream = require('stream');
 const sendSeekable = require('send-seekable');
+const fuzzySearch = require("mongoose-fuzzy-searching-v2");
 
 router.use(sendSeekable);
 
@@ -148,10 +146,11 @@ const upload = multer({
 });
 
 router.post('/upload', isUserAuthenticated, upload.single('file'), (req, res) => {
-	console.log(req.file);
+	console.log(req.body);
+	console.log(req.file)
 	console.log('upload file from: ' + JSON.stringify(req.user._id));
 	console.log("original name extension: " + path.extname(req.file.originalname))
-	if (path.extname(req.file.originalname) != ".mp4" && path.extname(req.file.originalname) != ".jpeg") {
+	if (path.extname(req.file.originalname) !== ".mp4" && path.extname(req.file.originalname) !== ".jpeg") {
 		return res.status(404).send();
 	} else {
 		crypto.randomBytes(16, (err, buf) => {
@@ -170,7 +169,8 @@ router.post('/upload', isUserAuthenticated, upload.single('file'), (req, res) =>
 				fileid: uploadStream.id,
 				date: req.file.uploadDate,
 				extension: path.extname(req.file.originalname),
-				caption: req.body.caption ? req.body.caption : null
+				caption: req.body.caption ? req.body.caption : null,
+				username: req.user.username
 			}
 			User.update({
 				_id: req.user._id
@@ -186,6 +186,38 @@ router.post('/upload', isUserAuthenticated, upload.single('file'), (req, res) =>
 		})
 	}
 });
+
+router.post('/upload/profilepicture', isUserAuthenticated, upload.single('file'), (req, res) => {
+	console.log(req.file);
+	console.log('upload file from: ' + JSON.stringify(req.user._id));
+	console.log("original name extension: " + path.extname(req.file.originalname))
+	if (path.extname(req.file.originalname) !== ".mp4" && path.extname(req.file.originalname) !== ".jpeg" && path.extname(req.file.originalname) !== ".jpg") {
+		return res.status(404).send();
+	} else {
+		crypto.randomBytes(16, (err, buf) => {
+			if (err) {
+				return reject(err)
+			}
+			if (path.extname(req.file.originalname) === ".mp4") {
+				const vid = videoParser.parse(req.file.buffer)
+				console.log("resolution: " + vid.resolution())
+			}
+			const filename = buf.toString('hex') + path.extname(req.file.originalname).toUpperCase();
+			const uploadStream = gfs.gfs.openUploadStream(filename)
+			uploadStream.write(req.file.buffer);
+			uploadStream.end();
+			User.update({
+				_id: req.user._id
+			}, {
+				profilePicFileId: uploadStream.id
+			}, () => {
+				console.log('done adding profile pic');
+			})
+
+			res.status(200).send();
+		})
+	}
+})
 
 router.get('/users/:username', isUserAuthenticated, (req, res) => {
 
@@ -350,6 +382,7 @@ router.post('/users/:username/follow', isUserAuthenticated, (req, res) => {
 });
 
 router.get('/feed/:index', isUserAuthenticated, (req, res) => {
+	// TODO sort by date
 	User.findOne({
 		_id: req.user._id
 	}, (err, reqUser) => {
@@ -360,7 +393,9 @@ router.get('/feed/:index', isUserAuthenticated, (req, res) => {
 			let feed = []
 			let promises = []
 			for (user of reqUser.following) {
-				const findPromise = User.findOne({username: user.username}).exec();
+				const findPromise = User.findOne({
+					username: user.username
+				}).exec();
 				promises.push(findPromise);
 				findPromise.then(followingUser => {
 					if (followingUser) {
@@ -370,11 +405,26 @@ router.get('/feed/:index', isUserAuthenticated, (req, res) => {
 			}
 			Promise.all(promises).then(() => {
 				res.json({
-					feed: feed
+					feed: feed.slice(req.params.index, req.params.index + 50)
 				})
 			}).catch(err => console.log("promise err: " + err))
 		}
 	})
+})
+
+router.post('/users/search/user', isUserAuthenticated, (req, res) => {
+	User.fuzzySearch(req.body.search, (err, foundUsers) => {
+		console.log(req.body.search)
+		if (err) {
+			console.error("search error: " + err);
+			return res.status(500).send();
+		}
+		console.log("found users from search: " + foundUsers);
+		res.json({
+			foundUsers: foundUsers
+		})
+	})
+
 })
 
 module.exports = router;

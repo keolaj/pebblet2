@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 const bcrypt = require('bcryptjs');
 const postSchema = require('./post.model');
+const fuzzySearch = require("mongoose-fuzzy-searching");
 
 const userSchema = new Schema({
 	username: { type: String, required: true },
@@ -12,8 +13,11 @@ const userSchema = new Schema({
 	posts: [ postSchema ],
 	followers: [ { username: { type: String, required: false } } ],
 	following: [ { username: { type: String, required: false } } ],
+	profilePicFileId: { type: String, required: false },
 	date: { type: Date, required: true }
 });
+
+userSchema.plugin(fuzzySearch, {fields: ['username']})
 
 userSchema.methods = {
 	checkPassword: function (inputPassword) {

@@ -22,6 +22,8 @@
     "mongo-gridfs-storage": "^3.0.1",
     "mongodb": "^3.5.4",
     "mongoose": "^5.9.3",
+    "mongoose-fuzzy-searching": "VassilisPallas/mongoose-fuzzy-searching",
+    "mongoose-fuzzy-searching-v2": "^3.0.2",
     "morgan": "^1.9.1",
     "multer": "^1.4.2",
     "multer-gridfs-storage": "^4.0.2",
