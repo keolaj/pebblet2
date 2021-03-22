@@ -9,7 +9,6 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const videoParser = require('node-video-lib').MP4Parser;
 const sendSeekable = require('send-seekable');
-const fuzzySearch = require("mongoose-fuzzy-searching-v2");
 
 router.use(sendSeekable);
 
@@ -56,8 +55,6 @@ router.post('/', (req, res) => {
 					res.status(400).json('error: ' + err);
 					console.log(err);
 				})
-			// .then(res => console.log('user saved successfully! : ' + res))
-			// .catch(err => console.log('error: ' + err));
 		}
 	})
 });
@@ -119,24 +116,7 @@ router.post('/logout', (req, res) => {
 		})
 	}
 });
-// const storage = new GridFsStorage({
-// 	url: 'mongodb+srv://keola:thisismypassword@cluster0-zqpvq.mongodb.net/test?retryWrites=true&w=majority',
-// 	file: (req, file) => {
-// 		return new Promise((resolve, reject) => {
-// 			crypto.randomBytes(16, (err, buf) => {
-// 				if (err) {
-// 					return reject(err)
-// 				}
-// 				const filename = buf.toString('hex') + path.extname(file.originalname);
-// 				const fileInfo = {
-// 					filename: filename,
-// 					bucketName: 'uploads',
-// 				}
-// 				resolve(fileInfo)
-// 			})
-// 		})
-// 	}
-// });
+
 const storage = multer.memoryStorage();
 const upload = multer({
 	storage: storage,
@@ -150,7 +130,7 @@ router.post('/upload', isUserAuthenticated, upload.single('file'), (req, res) =>
 	console.log(req.file)
 	console.log('upload file from: ' + JSON.stringify(req.user._id));
 	console.log("original name extension: " + path.extname(req.file.originalname))
-	if (path.extname(req.file.originalname) !== ".mp4" && path.extname(req.file.originalname) !== ".jpeg") {
+	if (path.extname(req.file.originalname) !== ".mp4" && path.extname(req.file.originalname) !== ".jpeg" && path.extname(req.file.originalname) !== ".jpg" && path.extname(req.file.originalname) !== ".png") {
 		return res.status(404).send();
 	} else {
 		crypto.randomBytes(16, (err, buf) => {
@@ -191,12 +171,14 @@ router.post('/upload/profilepicture', isUserAuthenticated, upload.single('file')
 	console.log(req.file);
 	console.log('upload file from: ' + JSON.stringify(req.user._id));
 	console.log("original name extension: " + path.extname(req.file.originalname))
-	if (path.extname(req.file.originalname) !== ".mp4" && path.extname(req.file.originalname) !== ".jpeg" && path.extname(req.file.originalname) !== ".jpg") {
+	if (path.extname(req.file.originalname) !== ".mp4" && path.extname(req.file.originalname) !== ".jpeg" && path.extname(req.file.originalname) !== ".jpg" && path.extname(req.file.originalname) !== ".png") {
 		return res.status(404).send();
 	} else {
 		crypto.randomBytes(16, (err, buf) => {
 			if (err) {
-				return reject(err)
+				console.error(err)
+				res.status(401).send()
+				return;
 			}
 			if (path.extname(req.file.originalname) === ".mp4") {
 				const vid = videoParser.parse(req.file.buffer)
@@ -212,9 +194,8 @@ router.post('/upload/profilepicture', isUserAuthenticated, upload.single('file')
 				profilePicFileId: uploadStream.id
 			}, () => {
 				console.log('done adding profile pic');
+				res.status(200).send();
 			})
-
-			res.status(200).send();
 		})
 	}
 })
@@ -228,14 +209,17 @@ router.get('/users/:username', isUserAuthenticated, (req, res) => {
 	}, (err, obj) => {
 		if (err) {
 			console.log(err);
-		} else {
+		} else if (obj) {
 			console.log("obj console.log for get user: " + obj)
 			userInfo = {
 				user: {
 					username: obj.username,
 					posts: obj.posts,
 					name: obj.name,
-					bio: obj.bio
+					bio: obj.bio,
+					followers: obj.followers,
+					following: obj.following,
+					profilePicFileId: obj.profilePicFileId
 				}
 			};
 			return res.json(userInfo);
@@ -252,6 +236,7 @@ router.get('/users/:username', isUserAuthenticated, (req, res) => {
 	});
 })
 
+// placeholder model for GridFS interaction
 const gridSchema = new mongoose.Schema({
 	length: {
 		type: Number
@@ -261,21 +246,21 @@ const gridSchema = new mongoose.Schema({
 });
 const Grid = mongoose.model('Grid', gridSchema, 'fs.files')
 
+// use sendSeekable for compatibility with safari and iOS
 router.get('/users/:username/:post', isUserAuthenticated, sendSeekable, (req, res) => {
 	Grid.findById(req.params.post, (err, obj) => {
-		if (obj) {
+		if (err) {
+			console.error("gridfs error: " + err);
+			return res.status(500).json("Error: " + err);
+		} else if (obj) {
 			console.log("obj: " + obj.length);
 			let readStream = gfs.gfs.openDownloadStream(mongoose.Types.ObjectId(req.params.post))
 			res.sendSeekable(readStream, {
 				type: 'video/mp4',
 				length: obj.length
 			})
-			// readStream.on('data', (file) => {
-			// 	res.status(206);
-
-			// 	res.setHeader('Content-Length', obj.length.toString());
-			// 	res.send(file)
-			// })
+		} else {
+			res.status(404).json("could not find file")
 		}
 	})
 
@@ -319,9 +304,7 @@ router.post('/users/:username/:post/comment', isUserAuthenticated, (req, res) =>
 })
 
 router.post('/users/:username/follow', isUserAuthenticated, (req, res) => {
-	if (req.user.username === req.params.username) return res.status(404).json({
-		err: 'you are trying to follow yourself'
-	});
+	if (req.user.username === req.params.username) return res.status(404).json('you are trying to follow yourself');
 	User.findOneAndUpdate({
 			username: req.params.username,
 			'followers.username': {
@@ -334,32 +317,34 @@ router.post('/users/:username/follow', isUserAuthenticated, (req, res) => {
 					username: req.user.username
 				}
 			}
-		}), (err, res) => {
+		}), (err, res1) => {
 			if (err) {
 				console.log(err)
 			} else {
 				console.log('follower added')
+				User.findOneAndUpdate({
+					username: req.user.username,
+					'following.username': {
+						$ne: req.params.username
+					}
+				},
+				({
+					$addToSet: {
+						following: {
+							username: req.params.username
+						}
+					}
+				}), (err, res2) => {
+					if (err) {
+						console.log(err)
+					} else {
+						console.log('following added')
+						res.json('successfully followed')
+					}
+				})
 			}
 		})
-	User.findOneAndUpdate({
-			username: req.user.username,
-			'following.username': {
-				$ne: req.params.username
-			}
-		},
-		({
-			$addToSet: {
-				following: {
-					username: req.params.username
-				}
-			}
-		}), (err, res) => {
-			if (err) {
-				console.log(err)
-			} else {
-				console.log('following added')
-			}
-		})
+	
 	// let userToFollow = User.findOne({username: req.params.username})
 	// if (!userToFollow.followers.find({username: req.user.username})) {
 	// 	userToFollow.followers.push({uesrname: req.user.username});
@@ -420,8 +405,13 @@ router.post('/users/search/user', isUserAuthenticated, (req, res) => {
 			return res.status(500).send();
 		}
 		console.log("found users from search: " + foundUsers);
+		let processedUsers = [];
+		for (user of foundUsers) {
+			processedUsers.push({username: user.username, profilePicFileId: user.profilePicFileId ? user.profilePicFileId : null})
+		}
+		console.log(processedUsers)
 		res.json({
-			foundUsers: foundUsers
+			foundUsers: processedUsers
 		})
 	})
 
